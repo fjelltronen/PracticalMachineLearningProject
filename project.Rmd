@@ -29,7 +29,7 @@ str(training, list.len = 10) ## show only the first 10 variables
 
 This data set includes 159 variables that can be used to predict the `classe` value. Some of these are removed prior to building the machine learning model. 
 
-A bried analysis of the `new_window` and `num_window` variables showed that the number of measurements for each window is inconsistent. Not all windows have a `new_window == yes`. For this reason, these two variables are removed.
+A brief analysis of the `new_window` and `num_window` variables showed that the number of measurements for each window is inconsistent. Not all windows have a `new_window == yes`. For this reason, these two variables are removed.
 
 ```{r}
 head(table(training$num_window,training$new_window))
@@ -51,7 +51,7 @@ In addition to direct measurements from the sensors attached to various parts of
 library(caret)
 ## identify features that have no variability
 nzVar <- nearZeroVar(training, saveMetrics=TRUE)
-# keep only those with nzv == TRUE
+# keep only those with nzv == FALSE
 toKeep <- row.names(nzVar[nzVar$nzv == FALSE,])
 training<-training[, (names(training) %in% toKeep)]
 str(training, list.len = 10)
@@ -61,21 +61,46 @@ NOTE: `nearZeroVar()` does not eliminate all these variable. However, it reduces
 
 ## Data Pre-Processing
 
-The training data includes many missing values for various measurements. We estimate these values using the k nearest neighbors imputation.
+The training data includes many missing values for various measurements. We estimate these values using the k nearest neighbors imputation, since most learning algorithms cannot handle missing values.
 
 ```{r}
+set.seed(2018-5-13)
 ## preProcessing object to handle missing data (94th column is classe)
 preObj <- preProcess(training[,-94], method = "knnImpute")
 trainingPP <- predict(preObj, training[,-94])
+str(trainingPP, list.len = 10)
 ```
 
 ## Model Construction
 
-For this prediction task, we use the random forest framework to build a model that predicts that `classe` variable from all other variables of the pre-processed training data. Random forest is one of the most used/accurate algorithms.
+For this prediction task, we use the *random forest* framework to build a model that predicts that `classe` variable from all other variables of the pre-processed training data. Random forest is one of the most used/accurate algorithms.
 
 ```{r}
-#fit <- train(training$classe ~ ., data = trainingPP, method = "rf", trControl = trainControl(method="cv"), ntrees = 10)
+library(randomForest)
+fit <- randomForest(training$classe ~ ., data = trainingPP)
+fit
 ```
 
-## Expected Out-of-Sample Error
+### Expected Out-of-Sample Error
 
+The model's OOB estimate of error rate is 0.57% (as shown above). The error rate plot is shown below.
+
+```{r}
+plot(fit)
+```
+
+## Testing Data Predictions
+
+We apply the same data pre-processing operations to the testing data set as well and retrieve the predicted `classe` values.
+
+```{r}
+# load testing data
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+# apply the pre-processing done for training
+testing <- testing[, (names(testing) %in% toKeep)]
+str(testing, list.len = 10) ## reduced to 93 variables
+testingPP <- predict(preObj, testing)
+str(testingPP, list.len = 10) ## no missing values
+# predict `classe` values
+predict(fit, testingPP)
+```

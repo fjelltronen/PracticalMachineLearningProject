@@ -1,0 +1,81 @@
+---
+title: "Quality of Weight Lifting Exercises -- Prediction Assignment"
+author: "fjelltronen"
+date: "May 13, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+
+In this report, we detail a prediction model for the quality of weight lifting exercises, developed using the Weight Lifting Exercises Dataset (http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har). First, we describe the WLE data. Then, we detail the data pre-processing, feature selection, model construction, and expected out of sample error.
+
+## Weight Lifting Exercises Dataset
+
+The WLE data set contains various on-body sensor measurements for 6 participants that were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions: exactly according to the specification (Class A) and 4 common mistakes (Classes B, C, D, and E).
+
+```{r}
+## complete training dataset
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+str(training, list.len = 10) ## show only the first 10 variables
+```
+
+`classe` is the variable denoting the target exercise class (`A`, `B`, `C`, `D`, and `E`).
+
+## Initial Data Pre-Processing
+
+This data set includes 159 variables that can be used to predict the `classe` value. Some of these are removed prior to building the machine learning model. 
+
+A bried analysis of the `new_window` and `num_window` variables showed that the number of measurements for each window is inconsistent. Not all windows have a `new_window == yes`. For this reason, these two variables are removed.
+
+```{r}
+head(table(training$num_window,training$new_window))
+```
+
+Furthermore, by relying on the `user_name` information, the models would become applicable only to these 6 users. This information is removed as well. The `X` and timestamp columns are removed as well.
+
+```{r}
+## removing unwanted columns:
+toRemove <- c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")
+training<-training[, !(names(training) %in% toRemove)]
+```
+
+## Feature Selection
+
+In addition to direct measurements from the sensors attached to various parts of the body (belt, arm, forearm, and dumbell), the data includes `min_`, `max_`, `avg_`, `var_`, `stddev_`, `total_` values derived from the others. For this reason, we remove all variables that have no variablity within our training set.
+
+```{r}
+library(caret)
+## identify features that have no variability
+nzVar <- nearZeroVar(training, saveMetrics=TRUE)
+# keep only those with nzv == TRUE
+toKeep <- row.names(nzVar[nzVar$nzv == FALSE,])
+training<-training[, (names(training) %in% toKeep)]
+str(training, list.len = 10)
+```
+
+NOTE: `nearZeroVar()` does not eliminate all these variable. However, it reduces the dimensionality of the data.
+
+## Data Pre-Processing
+
+The training data includes many missing values for various measurements. We estimate these values using the k nearest neighbors imputation.
+
+```{r}
+## preProcessing object to handle missing data (94th column is classe)
+preObj <- preProcess(training[,-94], method = "knnImpute")
+trainingPP <- predict(preObj, training[,-94])
+```
+
+## Model Construction
+
+For this prediction task, we use the random forest framework to build a model that predicts that `classe` variable from all other variables of the pre-processed training data. Random forest is one of the most used/accurate algorithms.
+
+```{r}
+#fit <- train(training$classe ~ ., data = trainingPP, method = "rf", trControl = trainControl(method="cv"), ntrees = 10)
+```
+
+## Expected Out-of-Sample Error
+
